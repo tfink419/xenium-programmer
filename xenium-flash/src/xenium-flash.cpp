@@ -187,6 +187,7 @@ int main(int argc, char** argv)
 
 // ********************* FLASH CHIP VERIFY ***************** 
     now = std::chrono::steady_clock::now();
+    uint error_count = 0;
     progress = 0.0;
     for (uint32_t i = 0; i < flash_size; i++)
     {
@@ -198,9 +199,7 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::cout << std::endl << "ERROR\n\n** XENIUM FLASH VERIFY FAILED!! **\n" << std::endl;
-            flash.ChipReset();
-            return -1;
+            error_count++;
         }
         
         float current_progress = (float) i / flash_size * 100.0f;
@@ -208,20 +207,35 @@ int main(int argc, char** argv)
         {
             progress = current_progress;
             std::cout << "\rVerifying Flash: " << std::fixed << std::setprecision(0) 
-                      << progress << "%              " << std::flush;
+                      << progress << "%              ";
+            std::cout << "Errors: " << error_count << std::flush;
         }
     }
     elapsed = std::chrono::steady_clock::now() - now;
     sec = std::chrono::duration_cast<std::chrono::seconds>(elapsed).count();
     std::cout << "\rVerifying Flash: DONE (" <<  sec << " Seconds)" << std::endl;
 
-// you can uncomment this code if you wish to dump to file from xenium 
-    // //write to file
-    // std::string outfile = "flash.bin";
-    // std::ofstream fout(outfile);
-    // fout.write(flash_buffer, flash_size);
-    // fout.close();
-    // std::cout << "Writing Xenium flash dumped to file: " << outfile << std::endl;
+    if (error_count != 0)
+    {
+        std::string erase_ok;
+        if (!force) {
+            std::cout << "Verify Failed, Continue and Dump Flash Memory? (Yes/No)" << std::flush;
+            std::getline (std::cin, erase_ok);
+        }
+
+        if (force || (erase_ok.find("Y") == 0) || (erase_ok.find("y") == 0))
+        {
+            std::string outfile = "flash.bin";
+            std::ofstream fout(outfile);
+            fout.write(flash_buffer, flash_size);
+            fout.close();
+            std::cout << "Writing Xenium flash dumped to file: " << outfile << std::endl;
+        }
+        else {
+            std::cout << "\n** XENIUM FLASH CANCELLED!! **\n" << std::endl;
+            return -1;
+        }
+    }
 
     // clear out flash memory.
     delete[] flash_buffer;
